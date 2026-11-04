@@ -1,0 +1,60 @@
+name: CI Pipeline - Lint, Test & Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Job 1: Quality Gate & Automated Testing (Runs on clean isolated Ubuntu VM)
+  # -------------------------------------------------------------------------
+  quality-gate:
+    name: Lint, Typecheck & Unit Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: labs/01-node-service
+
+    steps:
+      # Step 1: Clone the repository onto the runner's local disk
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # Step 2: Provision Node.js runtime and configure deterministic dependency cache
+      - name: Setup Node.js Environment (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: labs/01-node-service/package-lock.json
+
+      # Step 3: Hermetic dependency installation (strict lockfile enforcement)
+      - name: Clean Install Dependencies (npm ci)
+        run: npm ci
+
+      # Step 4: Fast Fail - Static linting check (< 5 seconds)
+      - name: Code Quality & Linting
+        run: npm run lint
+
+      # Step 5: Fast Fail - TypeScript static type check
+      - name: Type Integrity Verification (tsc)
+        run: npm run typecheck
+
+      # Step 6: Execute sub-second in-memory unit tests
+      - name: Run Unit Test Suite
+        run: npm run test:ts
+
+      # Step 7: Build production distribution files
+      - name: Compile Production Bundle
+        run: npm run build
+
+      # Step 8: Upload the compiled output as an immutable CI artifact
+      - name: Archive Production Artifact (dist)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pricing-service-dist
+          path: labs/01-node-service/dist/
+          retention-days: 7

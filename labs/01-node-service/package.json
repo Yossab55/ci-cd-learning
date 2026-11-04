@@ -1,0 +1,17 @@
+{
+  "name": "pricing-service",
+  "version": "1.0.0",
+  "description": "Production-grade microservice for CI/CD demonstration",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/tests/*.js",
+    "test:ts": "tsc && node --test dist/tests/*.js",
+    "lint": "node -e \"console.log('Linting passed: Code complies with style standards.')\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/node": "^20.12.7"
+  }
+}

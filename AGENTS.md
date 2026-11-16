@@ -101,7 +101,7 @@ CI-CD-learning/
 | Phase | Milestone / Domain | Key Topics | Status | Notes / Links |
 | :---: | :--- | :--- | :---: | :--- |
 | **01** | **The Foundations & The "Why"** | The Software Crisis, Integration Hell, "Works on My Machine", Small Batches, DORA Metrics | ✅ Mastered | [why-cicd.md](file:///home/yossab/1-Project/CI-CD-learning/concepts/01-fundamentals/why-cicd/why-cicd.md) |
-| **02** | **Continuous Integration (CI)** | Git branch models (Trunk vs GitFlow), Runners & Agents, Build reproducibility, Test Pyramid, Fast feedback | 🟡 In Progress | [ci.yml](file:///home/yossab/1-Project/CI-CD-learning/.github/workflows/ci.yml), [pricing-engine.ts](file:///home/yossab/1-Project/CI-CD-learning/labs/01-node-service/src/pricing-engine.ts) |
+| **02** | **Continuous Integration (CI)** | Git branch models (Trunk vs GitFlow), Runners & Agents, Build reproducibility, Test Pyramid, Ephemeral `services:`, DB Isolation, Matrix Sharding | ✅ Mastered | [ci-mechanics.md](file:///home/yossab/1-Project/CI-CD-learning/concepts/02-continuous-integration/ci-mechanics/ci-mechanics.md), [ci.yml](file:///home/yossab/1-Project/CI-CD-learning/.github/workflows/ci.yml), [promo-repository.ts](file:///home/yossab/1-Project/CI-CD-learning/labs/01-node-service/src/promo-repository.ts) |
 | **03** | **Continuous Delivery (CD)** | Artifact Registries, Immutability, Release Gates, Environment Parity, Staging vs Prod | ⏳ Planned | Build once, deploy anywhere |
 | **04** | **Containerization & Pipelines** | Docker multi-stage builds, Layer caching in CI, Ephemeral test runners, Compose in CI | ⏳ Planned | Optimizing runner speed & cache hits |
 | **05** | **Zero-Downtime Deployment Strategies** | Recreate, Rolling Update, Blue/Green, Canary Releases, Feature Flags & Rollbacks | ⏳ Planned | Traffic routing, health probes, automated rollback |
@@ -116,6 +116,6 @@ At the conclusion of any active tutoring or engineering session, the agent must 
 1. **Git Status & Security Inspection**: Ensure no untracked credentials (`.env`, private keys) are exposed.
 2. **Conventional Commit**: Stage changes and craft descriptive conventional commits (`feat:`, `docs:`, `chore:`, `test:`).
 3. **MANDATORY Push**: Push all commits to the remote GitHub repository:
-   - Target: `git@github.com:Yossab55/CI-CD-learning.git`
-   - Branch: `master`
+   - Target: `git@github.com:Yossab55/ci-cd-learning.git`
+   - Branch: `main`
 4. **Update `session.md`**: Record the accomplishments, commit hashes, companion agent actions, and next-step roadmap.

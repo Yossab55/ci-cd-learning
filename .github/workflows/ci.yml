@@ -58,3 +58,63 @@ jobs:
           name: pricing-service-dist
           path: labs/01-node-service/dist/
           retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Job 2: Sharded PostgreSQL Integration Tests (Parallel Matrix VMs)
+  # -------------------------------------------------------------------------
+  integration-test:
+    name: Integration Tests (Shard ${{ matrix.shard }})
+    needs: quality-gate
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    defaults:
+      run:
+        working-directory: labs/01-node-service
+
+    # Ephemeral PostgreSQL sidecar container per matrix VM
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: pricing_test
+        ports:
+          # Bind container 5432 to Ubuntu host VM localhost:5432
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d pricing_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: labs/01-node-service/package-lock.json
+
+      - name: Clean Install Dependencies (npm ci)
+        run: npm ci
+
+      # Reuse compiled dist/ from quality-gate via Artifact Bridge
+      - name: Download Compiled Artifact (dist)
+        uses: actions/download-artifact@v4
+        with:
+          name: pricing-service-dist
+          path: labs/01-node-service/dist
+
+      - name: Run PostgreSQL Integration Tests (Shard ${{ matrix.shard }})
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/pricing_test
+        run: npm run test:integration:shard${{ matrix.shard }}

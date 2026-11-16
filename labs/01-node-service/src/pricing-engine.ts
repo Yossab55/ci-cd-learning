@@ -48,14 +48,31 @@ export class PricingEngine {
    * Generates a final deterministic pricing quote
    */
   public generateQuote(items: PricingItem[], taxRate: number, currency?: Currency): PricingQuote {
+    return this.generateQuoteWithPromo(items, taxRate, 0, currency);
+  }
+
+  /**
+   * Generates a deterministic pricing quote with an optional promotional discount rate
+   * combined with volume discounts (capped at 100%).
+   */
+  public generateQuoteWithPromo(
+    items: PricingItem[],
+    taxRate: number,
+    promoRate: number = 0,
+    currency?: Currency,
+  ): PricingQuote {
     if (taxRate < 0 || taxRate > 1) {
       throw new Error(`Invalid tax rate: must be between 0.0 and 1.0 (received: ${taxRate})`);
+    }
+    if (promoRate < 0 || promoRate > 1) {
+      throw new Error(`Invalid promo rate: must be between 0.0 and 1.0 (received: ${promoRate})`);
     }
 
     const subtotal = this.calculateSubtotal(items);
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const discountRate = this.calculateDiscountRate(totalQuantity);
-    const discountAmount = Number((subtotal * discountRate).toFixed(2));
+    const volumeRate = this.calculateDiscountRate(totalQuantity);
+    const effectiveDiscountRate = Math.min(1, volumeRate + promoRate);
+    const discountAmount = Number((subtotal * effectiveDiscountRate).toFixed(2));
     const taxableAmount = subtotal - discountAmount;
     const taxAmount = Number((taxableAmount * taxRate).toFixed(2));
     const total = Number((taxableAmount + taxAmount).toFixed(2));

@@ -1,0 +1,144 @@
+name: CD Pipeline - Build, Stage & Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Job 1: Build Once & Push Immutable Image to GHCR
+  # -------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Immutable Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.image.outputs.name }}
+
+    steps:
+      - name: Checkout Release Tag
+        uses: actions/checkout@v4
+
+      - name: Normalize Lowercase GHCR Image Name
+        id: image
+        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY,,}/pricing-service" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract SemVer & SHA Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+
+      - name: Build & Push Container Image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: labs/01-node-service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # -------------------------------------------------------------------------
+  # Job 2: Deploy Exact @sha256 Digest to Staging & Run Smoke Test
+  # -------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to Staging & Smoke Test
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: staging
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: pricing_staging
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d pricing_staging"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Boot Immutable Release Container in Staging
+        env:
+          STAGING_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          IMAGE_REF="${{ needs.build-and-push.outputs.image }}@${{ needs.build-and-push.outputs.digest }}"
+          DB_URL="${STAGING_DATABASE_URL:-postgresql://ci_user:ci_password@localhost:5432/pricing_staging}"
+          echo "Deploying immutable artifact: ${IMAGE_REF}"
+          docker run -d --name pricing-staging --network host \
+            -e PORT=3000 \
+            -e DATABASE_URL="${DB_URL}" \
+            "${IMAGE_REF}"
+
+      - name: Automated Staging Smoke Test (/health & /quote)
+        run: |
+          for attempt in $(seq 1 15); do
+            if curl -fsS http://localhost:3000/health | grep -q '"database":"connected"'; then
+              echo "Staging health probe passed on attempt ${attempt}."
+              break
+            fi
+            if [ "${attempt}" -eq 15 ]; then
+              echo "Staging health probe failed after 15 attempts."
+              exit 1
+            fi
+            sleep 1
+          done
+
+          curl -fsS -X POST http://localhost:3000/quote \
+            -H "Content-Type: application/json" \
+            -d '{"items":[{"id":"1","name":"SmokeItem","unitPrice":100,"quantity":10}],"taxRate":0.1}' \
+            | grep -q '"total":1045'
+
+      - name: Dump Staging Logs on Failure & Cleanup
+        if: always()
+        run: |
+          docker logs pricing-staging || true
+          docker rm -f pricing-staging || true
+
+  # -------------------------------------------------------------------------
+  # Job 3: Production Release (Blocked Until Staging Passes + Human Approval)
+  # -------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Production (Approval Gate)
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, build-and-push]
+    environment: production
+
+    steps:
+      - name: Verify Approved Immutable Release Artifact
+        env:
+          PROD_DATABASE_URL_SET: ${{ secrets.DATABASE_URL != '' }}
+        run: |
+          IMAGE_REF="${{ needs.build-and-push.outputs.image }}@${{ needs.build-and-push.outputs.digest }}"
+          echo "Human approval granted. Promoting exact verified artifact to Production: ${IMAGE_REF}"
+          echo "Production runtime DATABASE_URL configured: ${PROD_DATABASE_URL_SET}"

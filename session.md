@@ -1,10 +1,10 @@
-# Session Log: 2026-11-17 / Milestone: Phase 03 — Continuous Delivery (CD) Theory Kickoff
+# Session Log: 2026-11-23 / Milestone: Phase 03 — Continuous Delivery (CD) Completed
 
 ## 📊 Curriculum Progress Tracker
 
 ```text
-Progress: [███░░░░░░░░░] 29% Complete (2 of 7 Phases Mastered)
-Current Milestone: Phase 03 — Continuous Delivery (CD) (In Progress)
+Progress: [█████░░░░░░░] 43% Complete (3 of 7 Phases Mastered)
+Current Milestone: Phase 03 — Continuous Delivery (CD) (Mastered) -> Next: Phase 04 — Containerization in CI/CD
 ```
 
 ### 🗺️ Curriculum Roadmap & Remaining Lessons:
@@ -13,7 +13,7 @@ Current Milestone: Phase 03 — Continuous Delivery (CD) (In Progress)
 | :---: | :--- | :---: | :--- |
 | **01** | **The Foundations & The "Why"** | ✅ Mastered | **Completed:**<br>• The Software Crisis & Integration Hell<br>• Syntactic vs Semantic merge conflicts<br>• Branch divergence risk formula ($N \times T^2$)<br>• Shift-Left principle & Cost-of-Defect curve<br>• 4 DORA Metrics (Deployment Frequency, Lead Time, MTTR, CFR)<br>• Knight Capital $440M manual deployment disaster |
 | **02** | **Continuous Integration (CI)** | ✅ Mastered | **Completed:**<br>• Trunk-Based Development vs GitFlow<br>• Physics of testing: In-memory unit vs I/O integration tests<br>• The Test Automation Pyramid vs Ice Cream Cone anti-pattern<br>• Runner cloud architecture: Steps (shared VM) vs Jobs (isolated VMs)<br>• The Artifact Bridge (`upload-artifact` / `download-artifact`)<br>• Hermetic builds: `npm ci` vs `npm install` & deterministic lockfile cache invalidation<br>• Database integration tests in CI using ephemeral `services:` (`postgres:16-alpine`) & `pg_isready` health checks<br>• Host-VM vs container networking & `beforeEach` `TRUNCATE` isolation<br>• Test sharding & parallel matrix builds (`strategy.matrix` with `fail-fast: false`)<br>• Lab 01: `PromoRepository`, `generateQuoteWithPromo()`, integration shards 1 & 2, and `ci.yml` |
-| **03** | **Continuous Delivery (CD)** | 🔄 In Progress | **Completed (Theory):**<br>• Artifacts vs source (`dist/`), `retention-days` TTL vs upload cadence, `actions/<repo>@<tag>`, and GHCR vs temporary CI artifacts<br>• Build Once, Deploy Anywhere (missing `package.json`, `node_modules/`, Node runtime in raw `dist/`; 3:00 AM rollback risks)<br>• Immutable release addressing: SemVer (`vMAJOR.MINOR.PATCH`) + `@sha256:...` digests vs mutable tags (`:latest`)<br>• 12-Factor runtime config injection (`DATABASE_URL`) vs build-time `Dockerfile` branching<br>• Environment parity (data scale: 100 vs 10M rows & engine parity: `postgres:16-alpine`)<br>• Continuous Delivery vs Continuous Deployment (manual approval gate vs automated prod deploy)<br>• Staging-to-Production safeguards (automated Staging smoke tests + GitHub Environments human approval gate)<br>**Remaining (Hands-On):**<br>• Design & implement `.github/workflows/cd.yml` (SemVer tag triggers, least-privilege `GITHUB_TOKEN`, `@sha256` digest bridge, Staging smoke test, Production approval gate)<br>• Phase 03 deep-dive guide & Draw.io diagram (`concepts/03-continuous-delivery/`)<br>• Update Logseq notes (`/home/yossab/5-Notes/pages/CI___CD.md`) |
+| **03** | **Continuous Delivery (CD)** | ✅ Mastered | **Completed:**<br>• Artifacts vs source (`dist/`), `retention-days` TTL, and GHCR vs temporary CI artifacts<br>• Build Once, Deploy Anywhere & immutable addressing (`v*.*.*` SemVer tags + `@sha256:...` digests)<br>• 12-Factor runtime config (`DATABASE_URL` injected via OS env, zero baked `.env`) & environment parity<br>• Least-privilege `GITHUB_TOKEN` (`contents: read`, `packages: write`) vs PATs<br>• 3-hop cross-VM output chain (`$GITHUB_OUTPUT` $\to$ `outputs:` $\to$ `needs.<job>.outputs.*`) & direct `needs:` visibility rule<br>• Deep `/health` probe (`SELECT 1`) + `curl -fsS` (`--fail`) Staging smoke test & `environment: production` human approval gate<br>• Lab 01 HTTP server (`src/index.ts`), `server.test.ts`, `Dockerfile`, `.dockerignore`, `.github/workflows/cd.yml`, Phase 03 guide & Draw.io diagram, and Logseq notes (`CI___CD.md`) |
 | **04** | **Containerization in CI/CD** | ⏳ Remaining | • Docker multi-stage builds (Builder vs Lean production image)<br>• Layer caching in CI (`docker/build-push-action` cache backends)<br>• Ephemeral test runners and Docker Compose in CI |
 | **05** | **Zero-Downtime Deployment Strategies** | ⏳ Remaining | • Blue/Green deployments & instant traffic cutover<br>• Canary releases with synthetic metric analysis<br>• Rolling updates & automated health rollback triggers<br>• Feature flags (launchdarkly/openfeature pattern) |
 | **06** | **DevSecOps & Supply Chain Security** | ⏳ Remaining | • SAST (Semgrep / SonarQube) & DAST (OWASP ZAP)<br>• Dependency vulnerability scanning (Snyk / npm audit)<br>• Container image scanning (Trivy)<br>• Software Bill of Materials (SBOM) & cryptographic signing (Sigstore/Cosign) |
@@ -21,7 +21,34 @@ Current Milestone: Phase 03 — Continuous Delivery (CD) (In Progress)
 
 ---
 
-## 1. What Happened in This Session (2026-11-17)
+## 1. What Happened in This Session (2026-11-23)
+- **Feature / Goal Completed**: Completed **Phase 03 — Continuous Delivery (CD)** hands-on implementation, verification, documentation, and Logseq knowledge sync.
+- **Key Changes**:
+  - `labs/01-node-service/src/index.ts`, `tests/server.test.ts`, `package.json`: Built zero-dependency `node:http` server exposing deep PostgreSQL health probe (`GET /health` executing `SELECT 1`, returning `200`/`503`), `POST /quote`, graceful `SIGTERM`/`SIGINT` shutdown, unit tests, and `"main": "dist/src/index.js"` / `"start": "node dist/src/index.js"`.
+  - `labs/01-node-service/Dockerfile` & `.dockerignore`: Packaged `node:20-alpine` container executing `npm ci`, build-time `npm run build && npm prune --omit=dev`, and non-root `USER node` runtime.
+  - `.github/workflows/cd.yml`: Implemented full tag-triggered (`v*.*.*`) CD pipeline with least-privilege `contents: read` + `packages: write`, lowercase GHCR image normalization, `docker/login-action@v3`, `docker/metadata-action@v5`, `docker/build-push-action@v6`, cross-VM `outputs.digest` bridge, `deploy-staging` (`environment: staging` + `postgres:16-alpine` sidecar + `curl -fsS` `/health` & `/quote` smoke tests), and `deploy-production` (`needs: [deploy-staging, build-and-push]` + `environment: production` human approval gate).
+  - `concepts/03-continuous-delivery/continuous-delivery/continuous-delivery.md` & `continuous-delivery.dio`: Authored Phase 03 architectural deep dive and Draw.io diagram.
+  - `AGENTS.md` & `/home/yossab/5-Notes/pages/CI___CD.md`: Marked Phase 03 `✅ Mastered` and updated Logseq notes with CD concepts, triggers, permissions, cross-VM outputs, and release gates.
+- **Verification**:
+  - `npm run lint`, `npm run typecheck`, `npm run test:ts` (10/10 unit tests passed), and `npm run build` exited `0`.
+  - Local `docker build` + ephemeral `postgres:16-alpine` smoke test exited `0`: `GET /health` returned `{"status":"ok","service":"pricing-service","database":"connected"}` and `POST /quote` returned `{"subtotal":1000,"discountAmount":50,"taxAmount":95,"total":1045,"currency":"USD"}`.
+  - `.github/workflows/cd.yml` YAML validation exited `0`.
+- **Git Commits**:
+  - `feat(lab01): add HTTP entrypoint, health probe, tests, and Dockerfile` (`a8a720f`)
+  - `ci(cd): add GHCR immutable release, staging smoke test, and production gate workflow` (`8a69083`)
+  - `docs(phase03): add Continuous Delivery guide, Draw.io diagram, and mark Phase 03 mastered` (`873bb63`)
+
+## 2. Companion Agent Actions
+- **Mentor Protocol**: `my-mentor` (`146b768d-c6f4-429f-b15a-5697195a74ef`) -> Guided Yossab Socratically through `on: push: tags:`, `packages: write`, `$GITHUB_OUTPUT` $\to$ `outputs:` $\to$ `needs:` cross-VM chain, `environment:` protection rules vs `if:`, Build-Time vs Runtime `CMD`, and delivered Senior Deep Dive on ephemeral `GITHUB_TOKEN`, deep `/health` (`SELECT 1`), and `curl -fsS`.
+- **Session Wrap-Up**: `close-session` (`d8a89576-33c0-448a-a265-2a0ac3c412a1`) -> Reported read-only toolset block; parent agent executed atomic micro-commits, `session.md` update, and `origin/main` push directly.
+
+## 3. What Could Be Next (Roadmap for Next Session)
+1. [ ] Optionally configure GitHub Repo `Settings -> Environments` (`staging` and `production` with Required Reviewers) and push a `v1.0.0` tag to watch `cd.yml` execute live on GitHub Actions.
+2. [ ] Begin **Phase 04 — Containerization in CI/CD**: Upgrade `labs/01-node-service/Dockerfile` to a multi-stage build (Builder vs minimal Production image), configure BuildKit layer caching in CI, and compare image size & build speed.
+
+---
+
+## Previous Session: 2026-11-17 / Milestone: Phase 03 — Continuous Delivery (CD) Theory Kickoff
 - **Feature / Goal Completed**: Kicked off **Phase 03 — Continuous Delivery (CD)** via Socratic mentoring and mastered all core CD mental models before hands-on pipeline implementation.
 - **Key Topics Mastered**:
   - **CI Artifacts, Actions & Registries**: Clarified `dist/` as a compiled build artifact, `retention-days` as a deletion TTL rather than a schedule, `actions/<repo>@<version>` syntax, and **GHCR (`ghcr.io`)** as a permanent versioned release warehouse.
